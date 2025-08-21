@@ -9,7 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ----------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("streamlit/Movies Recommendation.csv")
+    df = pd.read_csv("Movies Recommendation.csv")
     return df
 
 movies = load_data()
@@ -53,16 +53,18 @@ def get_recommendations(title, cosine_sim=cosine_sim):
 # Streamlit UI
 # ----------------------------
 st.title("🎬 Movie Recommendation System")
-st.write("Get movie recommendations based on your favorite movie!")
+st.write("Type a movie name to get recommendations!")
 
-movie_list = movies['Movie_Title'].dropna().unique()
-selected_movie = st.selectbox("Select a movie:", sorted(movie_list))
+movie_input = st.text_input("Enter a movie title:")
 
 if st.button("Recommend"):
-    recommendations = get_recommendations(selected_movie)
-    if recommendations:
-        st.subheader("Top Recommendations:")
-        for i, rec in enumerate(recommendations, start=1):
-            st.write(f"{i}. {rec}")
+    if movie_input.strip() == "":
+        st.warning("⚠️ Please enter a movie title.")
     else:
-        st.warning("Movie not found in dataset.")
+        recommendations = get_recommendations(movie_input.strip())
+        if recommendations:
+            st.subheader("Top Recommendations:")
+            for i, rec in enumerate(recommendations, start=1):
+                st.write(f"{i}. {rec}")
+        else:
+            st.error("❌ Movie not found in dataset. Try another title.")
