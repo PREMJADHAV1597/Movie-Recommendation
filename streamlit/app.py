@@ -9,7 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ----------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("Movies Recommendation.csv")
+    df = pd.read_csv("streamlit/Movies Recommendation.csv")
     return df
 
 movies = load_data()
