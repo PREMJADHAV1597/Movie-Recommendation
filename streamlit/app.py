@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
@@ -7,11 +6,10 @@ from thefuzz import process
 import requests
 
 # =======================
-# Load Data
+# Load Dataset
 # =======================
 movies = pd.read_csv("streamlit/Movies Recommendation.csv")
 
-# Make sure movie column exists
 if "Movie_Title" not in movies.columns:
     st.error("Dataset must have a column named 'Movie_Title'")
     st.stop()
@@ -19,20 +17,34 @@ if "Movie_Title" not in movies.columns:
 # =======================
 # IMDb API Config
 # =======================
-API_KEY = "YOUR_API_KEY"   # 🔑 Replace with your OMDb API key
+API_KEY = "YOUR_API_KEY"  # 🔑 Replace with OMDb API key
 
 def get_movie_details(title):
-    """Fetch movie details from OMDb API"""
+    """
+    Fetch movie details (fuzzy search + poster) from OMDb API.
+    """
+    # First try exact search
     url = f"http://www.omdbapi.com/?t={title}&apikey={API_KEY}"
-    response = requests.get(url)
-    data = response.json()
+    data = requests.get(url).json()
 
+    # If exact not found, try fuzzy search using 's=' (search endpoint)
+    if data.get("Response") == "False":
+        search_url = f"http://www.omdbapi.com/?s={title}&apikey={API_KEY}"
+        search_data = requests.get(search_url).json()
+
+        if search_data.get("Response") == "True":
+            first_match = search_data["Search"][0]["Title"]
+            url = f"http://www.omdbapi.com/?t={first_match}&apikey={API_KEY}"
+            data = requests.get(url).json()
+
+    # Return cleaned details
     if data.get("Response") == "True":
         return {
             "title": data.get("Title", "N/A"),
             "rating": data.get("imdbRating", "N/A"),
             "genre": data.get("Genre", "N/A"),
             "plot": data.get("Plot", "N/A"),
+            "poster": data.get("Poster", None) if data.get("Poster") != "N/A" else None
         }
     else:
         return {
@@ -40,16 +52,15 @@ def get_movie_details(title):
             "rating": "N/A",
             "genre": "N/A",
             "plot": "N/A",
+            "poster": None
         }
 
 # =======================
 # Recommendation Function
 # =======================
 def recommend(movie, n=5):
-    """Recommend movies based on cosine similarity"""
     cv = CountVectorizer(stop_words="english")
     count_matrix = cv.fit_transform(movies["Movie_Title"].fillna(""))
-
     cosine_sim = cosine_similarity(count_matrix)
 
     idx = movies[movies["Movie_Title"] == movie].index[0]
@@ -87,6 +98,10 @@ if user_input:
 
         for rec in recommendations:
             details = get_movie_details(rec)
+
+            # Display poster if available
+            if details["poster"]:
+                st.image(details["poster"], width=150)
 
             st.markdown(f"### {details['title']}")
             st.write(f"⭐ IMDb Rating: {details['rating']}")
