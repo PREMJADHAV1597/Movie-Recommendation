@@ -1,5 +1,5 @@
 streamlit
 pandas
 scikit-learn
+thefuzz
 requests
-thefuzz[speedup]
