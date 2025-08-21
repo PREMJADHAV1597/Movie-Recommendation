@@ -1,6 +1,7 @@
 # app.py
 import streamlit as st
 import pandas as pd
+import requests
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -45,15 +46,25 @@ def get_recommendations(title, cosine_sim=cosine_sim):
     idx = movies[movies['Movie_Title'] == title].index[0]
     sim_scores = list(enumerate(cosine_sim[idx]))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    sim_scores = sim_scores[1:11]  # top 10
+    sim_scores = sim_scores[1:6]  # Top 5 recommendations
     movie_indices = [i[0] for i in sim_scores]
     return movies['Movie_Title'].iloc[movie_indices].tolist()
 
 # ----------------------------
+# OMDb API Function
+# ----------------------------
+API_KEY = "your_api_key_here"  # 🔑 Replace with your OMDb API key
+
+def fetch_movie_details(title):
+    url = f"http://www.omdbapi.com/?t={title}&apikey={API_KEY}"
+    response = requests.get(url).json()
+    return response
+
+# ----------------------------
 # Streamlit UI
 # ----------------------------
-st.title("🎬 Movie Recommendation System")
-st.write("Type a movie name to get recommendations!")
+st.title("🎬 Movie Recommendation System with IMDb Data")
+st.write("Type a movie name to get recommendations + IMDb info!")
 
 movie_input = st.text_input("Enter a movie title:")
 
@@ -64,7 +75,21 @@ if st.button("Recommend"):
         recommendations = get_recommendations(movie_input.strip())
         if recommendations:
             st.subheader("Top Recommendations:")
-            for i, rec in enumerate(recommendations, start=1):
-                st.write(f"{i}. {rec}")
+            for rec in recommendations:
+                details = fetch_movie_details(rec)
+
+                # Show poster if available
+                poster = details.get("Poster")
+                if poster and poster != "N/A":
+                    st.image(poster, width=150)
+
+                # Show details
+                st.markdown(f"### {details.get('Title', rec)} ({details.get('Year','')})")
+                st.write(f"**IMDb Rating:** {details.get('imdbRating','N/A')}")
+                st.write(f"**Genre:** {details.get('Genre','N/A')}")
+                st.write(f"**Director:** {details.get('Director','N/A')}")
+                st.write(f"**Actors:** {details.get('Actors','N/A')}")
+                st.write(f"**Plot:** {details.get('Plot','N/A')}")
+                st.markdown("---")
         else:
             st.error("❌ Movie not found in dataset. Try another title.")
