@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from thefuzz import process  # for fuzzy matching
 
 # ----------------------------
 # Load Data
@@ -51,9 +52,19 @@ def get_recommendations(title, cosine_sim=cosine_sim):
     return movies['Movie_Title'].iloc[movie_indices].tolist()
 
 # ----------------------------
+# Fuzzy Matching Function
+# ----------------------------
+def correct_movie_title(user_input):
+    choices = movies['Movie_Title'].dropna().unique()
+    best_match, score = process.extractOne(user_input, choices)
+    if score > 60:  # threshold for acceptable match
+        return best_match
+    return None
+
+# ----------------------------
 # OMDb API Function
 # ----------------------------
-API_KEY = "your_api_key_here"  # 🔑 Replace with your OMDb API key
+API_KEY = "your_api_key_here"  # 🔑 Replace with OMDb API key
 
 def fetch_movie_details(title):
     url = f"http://www.omdbapi.com/?t={title}&apikey={API_KEY}"
@@ -63,8 +74,8 @@ def fetch_movie_details(title):
 # ----------------------------
 # Streamlit UI
 # ----------------------------
-st.title("🎬 Movie Recommendation System with IMDb Data")
-st.write("Type a movie name to get recommendations + IMDb info!")
+st.title("🎬 Smart Movie Recommendation System (with IMDb data)")
+st.write("Type a movie name (even with spelling mistakes!) to get recommendations.")
 
 movie_input = st.text_input("Enter a movie title:")
 
@@ -72,24 +83,41 @@ if st.button("Recommend"):
     if movie_input.strip() == "":
         st.warning("⚠️ Please enter a movie title.")
     else:
-        recommendations = get_recommendations(movie_input.strip())
-        if recommendations:
-            st.subheader("Top Recommendations:")
-            for rec in recommendations:
-                details = fetch_movie_details(rec)
+        # Correct user input with fuzzy matching
+        corrected_title = correct_movie_title(movie_input.strip())
 
-                # Show poster if available
-                poster = details.get("Poster")
-                if poster and poster != "N/A":
-                    st.image(poster, width=150)
+        if corrected_title:
+            st.success(f"🔍 Did you mean: **{corrected_title}** ?")
 
-                # Show details
-                st.markdown(f"### {details.get('Title', rec)} ({details.get('Year','')})")
-                st.write(f"**IMDb Rating:** {details.get('imdbRating','N/A')}")
-                st.write(f"**Genre:** {details.get('Genre','N/A')}")
-                st.write(f"**Director:** {details.get('Director','N/A')}")
-                st.write(f"**Actors:** {details.get('Actors','N/A')}")
-                st.write(f"**Plot:** {details.get('Plot','N/A')}")
-                st.markdown("---")
+            # Fetch details for the selected movie
+            details = fetch_movie_details(corrected_title)
+            st.subheader("🎥 Selected Movie")
+            if details.get("Poster") and details["Poster"] != "N/A":
+                st.image(details["Poster"], width=200)
+            st.markdown(f"### {details.get('Title', corrected_title)} ({details.get('Year','')})")
+            st.write(f"**IMDb Rating:** {details.get('imdbRating','N/A')}")
+            st.write(f"**Genre:** {details.get('Genre','N/A')}")
+            st.write(f"**Plot:** {details.get('Plot','N/A')}")
+            st.markdown("---")
+
+            # Show recommendations
+            recommendations = get_recommendations(corrected_title)
+            if recommendations:
+                st.subheader("✨ Top Recommendations:")
+                for rec in recommendations:
+                    rec_details = fetch_movie_details(rec)
+                    col1, col2 = st.columns([1, 3])
+                    with col1:
+                        poster = rec_details.get("Poster")
+                        if poster and poster != "N/A":
+                            st.image(poster, width=100)
+                    with col2:
+                        st.markdown(f"**{rec_details.get('Title', rec)}** ({rec_details.get('Year','')})")
+                        st.write(f"⭐ IMDb Rating: {rec_details.get('imdbRating','N/A')}")
+                        st.write(f"🎭 Genre: {rec_details.get('Genre','N/A')}")
+                        st.write(f"📝 {rec_details.get('Plot','N/A')}")
+                        st.markdown("---")
+            else:
+                st.warning("No recommendations found.")
         else:
-            st.error("❌ Movie not found in dataset. Try another title.")
+            st.error("❌ No close match found for your input. Try again.")
